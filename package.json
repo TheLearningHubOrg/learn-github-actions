@@ -1,0 +1,24 @@
+{
+  "name": "learn-github-actions",
+  "version": "1.0.0",
+  "description": "An exhaustive, production-grade GitHub Actions CI/CD and platform engineering masterclass.",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/github-actions.test.mjs"
+  },
+  "keywords": [
+    "github-actions",
+    "cicd",
+    "devops",
+    "automation",
+    "platform-engineering",
+    "sre",
+    "workflows",
+    "docker",
+    "oidc",
+    "arc"
+  ],
+  "author": "Manthan Ank",
+  "license": "MIT"
+}
