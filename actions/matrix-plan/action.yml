@@ -1,0 +1,18 @@
+name: Matrix plan
+description: Expands a strategy.matrix object the way GitHub does and returns it as a list for matrix.include.
+inputs:
+  matrix:
+    description: JSON object in the same shape as strategy.matrix (dimensions plus optional include/exclude).
+    required: true
+  max-jobs:
+    description: Fail when the plan has more jobs than this.
+    required: false
+    default: "256"
+outputs:
+  include:
+    description: JSON array of job combinations, ready for `matrix.include` via fromJSON().
+  count:
+    description: Number of jobs in the plan.
+runs:
+  using: node24
+  main: index.js

@@ -1,0 +1,47 @@
+# Stage 3: a matrix with exclude, include, fail-fast and max-parallel.
+name: Matrix
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (${{ matrix.os }}, node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    continue-on-error: ${{ matrix.experimental == true }}
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: [22, 24]
+        exclude:
+          - os: macos-latest
+            node: 22
+        include:
+          # Contradicts no original value in the node-24 jobs, so it merges into all three.
+          - node: 24
+            coverage: true
+          # Contradicts every original os value, so it becomes a new job.
+          - os: ubuntu-24.04-arm
+            node: 24
+          # Also a new job; experimental, so its failure does not fail the run.
+          - os: ubuntu-latest
+            node: 25
+            experimental: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Coverage on the jobs that asked for it
+        if: matrix.coverage
+        run: node --test --experimental-test-coverage

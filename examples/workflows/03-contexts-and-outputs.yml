@@ -1,0 +1,74 @@
+# Stage 2: contexts, env precedence, step outputs, job outputs and the job summary.
+name: Contexts and outputs
+
+on: workflow_dispatch
+
+permissions:
+  contents: read
+
+env:
+  LEVEL: workflow
+  GREETING: hello
+
+jobs:
+  produce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      LEVEL: job
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      notes: ${{ steps.meta.outputs.notes }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 5
+
+      - name: Step env beats job env beats workflow env
+        env:
+          LEVEL: step
+        run: echo "LEVEL=$LEVEL GREETING=$GREETING" # prints LEVEL=step GREETING=hello
+
+      - name: Compute values and publish them
+        id: meta
+        run: |
+          version="$(date -u +%Y.%m.%d).${GITHUB_RUN_NUMBER}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          # Multi-line values need a heredoc whose delimiter cannot occur in the value.
+          delimiter="ghadelim_$(openssl rand -hex 8)"
+          {
+            echo "notes<<$delimiter"
+            git log --oneline -3
+            echo "$delimiter"
+          } >> "$GITHUB_OUTPUT"
+          echo "BUILD_VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: GITHUB_ENV is visible from the next step on
+        run: echo "BUILD_VERSION=$BUILD_VERSION"
+
+      - name: Write a job summary
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          {
+            echo "### Build $VERSION"
+            echo ""
+            echo "| Context | Value |"
+            echo "| --- | --- |"
+            echo "| actor | $GITHUB_ACTOR |"
+            echo "| ref | $GITHUB_REF |"
+            echo "| runner | $RUNNER_OS $RUNNER_ARCH |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  consume:
+    needs: produce
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read another job's outputs through the needs context
+        env:
+          VERSION: ${{ needs.produce.outputs.version }}
+          NOTES: ${{ needs.produce.outputs.notes }}
+        run: |
+          echo "version from produce: $VERSION"
+          printf '%s\n' "$NOTES"

@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: actionlint (workflows and example workflows)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      # releases.yml is kept byte-identical across the org, so it is not linted here.
+      - name: Run actionlint
+        run: |
+          docker run --rm -v "$PWD:/repo" --workdir /repo rhysd/actionlint:1.7.9 \
+            -color .github/workflows/ci.yml examples/workflows/*.yml
+
+  test:
+    name: Test (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v5
+      # The repo's own composite action: setup-node with npm cache, npm ci, npm test.
+      - uses: ./actions/node-ci
+        with:
+          node-version: ${{ matrix.node }}
+
+  plan:
+    name: Plan a matrix with the repo's JavaScript action
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      include: ${{ steps.plan.outputs.include }}
+      count: ${{ steps.plan.outputs.count }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: plan
+        uses: ./actions/matrix-plan
+        with:
+          matrix: |
+            {
+              "os": ["ubuntu-latest", "windows-latest"],
+              "node": [22, 24],
+              "exclude": [{ "os": "windows-latest", "node": 22 }],
+              "include": [{ "node": 24, "coverage": true }]
+            }
+
+  fan-out:
+    name: Run planned job (${{ matrix.os }}, Node ${{ matrix.node }})
+    needs: plan
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.include) }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Run the CLI on this runner
+        shell: bash
+        env:
+          COVERAGE: ${{ matrix.coverage || false }}
+          COUNT: ${{ needs.plan.outputs.count }}
+        run: |
+          echo "Planned jobs: $COUNT, coverage on this job: $COVERAGE"
+          node src/cli.js demo
+
+  docker:
+    name: Docker image builds, tests pass inside it, CLI runs
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          push: false
+          tags: guide-app:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Smoke test the container
+        run: docker run --rm guide-app:ci

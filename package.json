@@ -1,24 +1,26 @@
 {
   "name": "learn-github-actions",
   "version": "1.0.0",
-  "description": "An exhaustive, production-grade GitHub Actions CI/CD and platform engineering masterclass.",
-  "main": "index.js",
+  "description": "GitHub Actions guide with a tested model of the matrix, needs, cache, concurrency and OIDC rules, plus a JavaScript and a composite action.",
   "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
-    "test": "node --test tests/github-actions.test.mjs"
+    "test": "node --test",
+    "demo": "node src/cli.js demo"
   },
   "keywords": [
     "github-actions",
-    "cicd",
-    "devops",
-    "automation",
-    "platform-engineering",
-    "sre",
+    "ci-cd",
     "workflows",
-    "docker",
-    "oidc",
-    "arc"
+    "devops"
   ],
-  "author": "Manthan Ank",
-  "license": "MIT"
+  "author": "Manthan Ankolekar",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TheLearningHubOrg/learn-github-actions.git"
+  }
 }

@@ -1,0 +1,67 @@
+# Solution to the Stage 3 exercise: a planned matrix, a cached install,
+# artifacts per matrix job, a fan-in job and PR-only cancellation.
+name: Stage 3 exercise
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      include: ${{ steps.plan.outputs.include }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: plan
+        uses: ./actions/matrix-plan
+        with:
+          matrix: '{"os":["ubuntu-latest","windows-latest"],"node":[22,24],"exclude":[{"os":"windows-latest","node":22}]}'
+
+  test:
+    needs: plan
+    name: test (${{ matrix.os }}, ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.include) }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - shell: bash
+        run: node --test --test-reporter=junit --test-reporter-destination="report-${{ matrix.os }}-${{ matrix.node }}.xml"
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          # Names must be unique per job since upload-artifact v4.
+          name: report-${{ matrix.os }}-${{ matrix.node }}
+          path: report-*.xml
+          retention-days: 3
+
+  merge-reports:
+    needs: test
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: report-*
+          merge-multiple: true
+          path: reports
+      - run: ls -l reports

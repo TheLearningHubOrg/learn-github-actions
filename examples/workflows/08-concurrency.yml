@@ -1,0 +1,36 @@
+# Stage 3: cancel superseded PR runs, but never cancel a deploy halfway.
+name: Concurrency
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  # One group per workflow and per PR branch (or per pushed ref).
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  # Cancel old runs on PRs; on main let each run finish.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - run: echo "testing $GITHUB_SHA"
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # A job-level group shared by every workflow that deploys to staging.
+    # Deploys queue (one pending at most) instead of overlapping.
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
+    steps:
+      - run: echo "deploying $GITHUB_SHA to staging"

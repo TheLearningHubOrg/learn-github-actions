@@ -1,0 +1,33 @@
+name: Node CI
+description: Sets up Node with the npm cache, installs from the lockfile and runs the tests.
+inputs:
+  node-version:
+    description: Node.js version for actions/setup-node.
+    required: false
+    default: "24"
+  test-command:
+    description: Command that runs the test suite.
+    required: false
+    default: npm test
+outputs:
+  node-version:
+    description: The exact Node.js version that was installed.
+    value: ${{ steps.setup.outputs.node-version }}
+runs:
+  using: composite
+  steps:
+    - id: setup
+      uses: actions/setup-node@v5
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: npm
+    - name: Install from lockfile
+      shell: bash
+      run: npm ci
+    - name: Test
+      shell: bash
+      env:
+        TEST_COMMAND: ${{ inputs.test-command }}
+      run: |
+        echo "Running: $TEST_COMMAND"
+        bash -c "$TEST_COMMAND"

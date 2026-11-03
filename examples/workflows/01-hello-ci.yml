@@ -1,0 +1,37 @@
+# Stage 1: the smallest useful workflow. Copy it to .github/workflows/ in
+# any repo with a package.json and it runs on every push and pull request.
+name: Hello CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the commit that triggered the run
+        uses: actions/checkout@v5
+
+      - name: Install Node 24 and restore the npm cache
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install exactly what the lockfile says
+        run: npm ci
+
+      - name: Run the tests
+        run: npm test
+
+      - name: Show where we ran
+        run: |
+          echo "Runner: $RUNNER_OS / $RUNNER_ARCH"
+          echo "Workspace: $GITHUB_WORKSPACE"
+          echo "Commit: $GITHUB_SHA on $GITHUB_REF"

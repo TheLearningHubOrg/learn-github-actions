@@ -1,0 +1,42 @@
+# Solution to the Stage 1 exercise: a manual-or-push workflow with zero
+# default token permissions, a 5-minute timeout and a deliberate failure
+# that only happens when the `fail` input is true.
+name: Stage 1 exercise
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      fail:
+        description: Make the second step fail
+        type: boolean
+        default: false
+
+permissions: {}
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Print runner facts
+        run: |
+          echo "os=$RUNNER_OS arch=$RUNNER_ARCH"
+          echo "event=$GITHUB_EVENT_NAME run=$GITHUB_RUN_ID attempt=$GITHUB_RUN_ATTEMPT"
+          nproc
+          df -h "$GITHUB_WORKSPACE" | tail -1
+
+      - name: Fail on request
+        env:
+          SHOULD_FAIL: ${{ inputs.fail }}
+        run: |
+          if [ "$SHOULD_FAIL" = "true" ]; then
+            echo "::error title=Requested failure::the fail input was true"
+            exit 1
+          fi
+          echo "no failure requested"
+
+      - name: Runs only after a failure
+        if: failure()
+        run: echo "the previous step failed, exit code was non-zero"

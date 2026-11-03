@@ -1,0 +1,47 @@
+# Stage 2: triggers, filters and manual inputs in one file.
+name: Triggers
+
+on:
+  push:
+    branches: [main, 'release/**']
+    tags: ['v*.*.*']
+    paths-ignore: ['docs/**', '**/*.md']
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main]
+    paths: ['src/**', 'package-lock.json', '.github/workflows/**']
+  schedule:
+    - cron: '17 3 * * 1-5' # 03:17 UTC on weekdays; off the hour to dodge the top-of-hour queue
+  workflow_dispatch:
+    inputs:
+      tier:
+        description: Where to deploy
+        type: choice
+        options: [staging, production]
+        default: staging
+      dry-run:
+        description: Print the plan without deploying
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  describe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Draft PRs are skipped until they are marked ready_for_review.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    steps:
+      - name: Explain why this run started
+        env:
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          TIER: ${{ inputs.tier }}
+          DRY_RUN: ${{ inputs.dry-run }}
+        run: |
+          echo "event=$EVENT ref=$REF"
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            echo "manual run: tier=$TIER dry-run=$DRY_RUN"
+          fi
